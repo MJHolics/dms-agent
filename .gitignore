@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+models/*.pt
+models/*.onnx
+data/test_videos/*.mp4
+data/test_videos/*.avi
+output/
+.DS_Store

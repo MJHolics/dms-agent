@@ -1,0 +1,26 @@
+# Core
+opencv-python>=4.8.0
+mediapipe>=0.10.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# YOLO
+ultralytics>=8.0.0
+
+# LangGraph / LangChain
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-ollama>=0.2.0
+langchain-community>=0.3.0
+
+# API
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9
+
+# Utilities
+python-dotenv>=1.0.0
+Pillow>=10.0.0
+matplotlib>=3.7.0
+jupyter>=1.0.0
+ipykernel>=6.0.0
