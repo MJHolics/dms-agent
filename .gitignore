@@ -9,3 +9,9 @@ data/test_videos/*.mp4
 data/test_videos/*.avi
 output/
 .DS_Store
+
+# IDE / AI assistant internals
+.claude/
+.vscode/
+CLAUDE.md
+anaconda_projects/
