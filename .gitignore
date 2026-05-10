@@ -7,7 +7,8 @@ models/*.pt
 models/*.onnx
 data/test_videos/*.mp4
 data/test_videos/*.avi
-output/
+output/*.mp4
+output/*.avi
 .DS_Store
 
 # IDE / AI assistant internals
