@@ -1,14 +1,18 @@
 """
-DMS Agent Pipeline
-Notebook 04의 코드를 모듈화한 버전 (FastAPI 서빙용)
+DMS Agent Pipeline — mediapipe Tasks API (0.10.x) 버전
+face_landmarker.task 모델을 최초 1회 자동 다운로드합니다 (~30MB).
 """
+import os
 import time
+import urllib.request
 from typing import TypedDict, Optional, List
 
 import cv2
 import numpy as np
-from scipy.spatial import distance as dist
 import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision
+from scipy.spatial import distance as dist
 from ultralytics import YOLO
 from langgraph.graph import StateGraph, END
 from langchain_ollama import ChatOllama
@@ -21,6 +25,12 @@ MOUTH      = [61, 291, 13, 14, 17, 0, 402, 178]
 EAR_THRESH = 0.25
 MAR_THRESH = 0.60
 DANGEROUS  = {67: 'cell phone', 73: 'book'}
+
+# 프로젝트 루트 기준 모델 경로
+_ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_MODEL_PATH = os.path.join(_ROOT, 'models', 'face_landmarker.task')
+_MODEL_URL  = ('https://storage.googleapis.com/mediapipe-models/'
+               'face_landmarker/face_landmarker/float16/1/face_landmarker.task')
 
 
 # ── State ─────────────────────────────────────────
@@ -88,26 +98,36 @@ def _head_pose(lm, shape):
 
 def _check_ollama():
     try:
-        import urllib.request
         urllib.request.urlopen('http://localhost:11434', timeout=1)
         return True
     except:
         return False
 
 
-# ── 모델 싱글톤 ───────────────────────────────────
-_face_mesh = None
-_yolo_model = None
+# ── 모델 싱글톤 ─────────────────────────────────
+_face_landmarker = None
+_yolo_model      = None
 
 
-def _get_face_mesh():
-    global _face_mesh
-    if _face_mesh is None:
-        _face_mesh = mp.solutions.face_mesh.FaceMesh(
-            max_num_faces=1, refine_landmarks=True,
-            min_detection_confidence=0.5, min_tracking_confidence=0.5
+def _get_face_landmarker():
+    global _face_landmarker
+    if _face_landmarker is None:
+        os.makedirs(os.path.dirname(_MODEL_PATH), exist_ok=True)
+        if not os.path.exists(_MODEL_PATH):
+            print('face_landmarker.task 다운로드 중 (~30MB)...')
+            urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
+            print('다운로드 완료')
+        base_options = mp_python.BaseOptions(model_asset_path=_MODEL_PATH)
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
+            min_tracking_confidence=0.5,
         )
-    return _face_mesh
+        _face_landmarker = vision.FaceLandmarker.create_from_options(options)
+    return _face_landmarker
 
 
 def _get_yolo():
@@ -122,13 +142,15 @@ def face_analysis_agent(state: DMSState) -> DMSState:
     if state['frame'] is None:
         return {**state, 'face_detected': False}
 
-    mesh = _get_face_mesh()
-    res  = mesh.process(cv2.cvtColor(state['frame'], cv2.COLOR_BGR2RGB))
+    landmarker = _get_face_landmarker()
+    rgb        = cv2.cvtColor(state['frame'], cv2.COLOR_BGR2RGB)
+    mp_image   = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+    result     = landmarker.detect(mp_image)
 
-    if not res.multi_face_landmarks:
+    if not result.face_landmarks:
         return {**state, 'face_detected': False, 'ear': None, 'mar': None}
 
-    lm   = res.multi_face_landmarks[0].landmark
+    lm   = result.face_landmarks[0]          # List[NormalizedLandmark]
     h, w = state['frame'].shape[:2]
 
     le = [(lm[i].x*w, lm[i].y*h) for i in LEFT_EYE]

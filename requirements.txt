@@ -1,6 +1,6 @@
 # Core
 opencv-python>=4.8.0
-mediapipe>=0.9.3,<0.10.0  # 0.10.x에서 mp.solutions API 제거됨
+mediapipe>=0.10.0  # Tasks API 사용 (0.10.x 기준, mp.solutions 대신 mediapipe.tasks)
 numpy>=1.24.0
 scipy>=1.10.0
 
