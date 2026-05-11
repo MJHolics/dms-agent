@@ -116,14 +116,16 @@ PERCLOS = (단위 시간 내 눈 감긴 프레임 수) / (전체 프레임 수)
 git clone https://github.com/MJHolics/dms-agent.git
 cd dms-agent
 
+# mediapipe 0.10.x는 mp.solutions API 없음 → 0.9.x 필수
 pip install -r requirements.txt
 ```
 
-**Ollama 설치 (LLM 로컬 실행):**
+**Ollama 설치 (LLM 로컬 실행, 선택사항):**
 ```bash
-# https://ollama.ai 에서 설치 후
+# https://ollama.com 에서 설치 후
 ollama pull qwen2.5:7b
 ollama serve
+# 미설치 시 Rule-based 경고 메시지로 자동 폴백
 ```
 
 ### 2. 로컬 실행
@@ -145,33 +147,43 @@ docker-compose up --build
 
 ## API
 
-### `POST /analyze/frame`
+Swagger UI: `http://localhost:8000/docs`
 
-웹캠 프레임(Base64)을 전송하면 운전자 상태를 분석합니다.
+### `GET /health`
+
+```json
+{"status": "ok", "service": "DMS Agent"}
+```
+
+### `POST /analyze`
+
+이미지 파일을 multipart/form-data로 전송하면 운전자 상태를 분석합니다.
 
 **Request:**
-```json
-{
-  "frame_b64": "<base64 encoded image>",
-  "frame_id": 42
-}
+```bash
+curl -X POST http://localhost:8000/analyze \
+     -F "file=@frame.jpg"
 ```
 
 **Response:**
 ```json
 {
+  "frame_id": 42,
+  "face_detected": true,
+  "ear": 0.21,
+  "mar": 0.45,
+  "yaw": 5.2,
+  "pitch": 3.1,
+  "perclos": 0.18,
+  "detected_objects": [],
+  "is_drowsy": true,
+  "is_yawning": false,
+  "is_distracted": false,
+  "has_danger_obj": false,
   "alert_level": 2,
-  "severity": "danger",
-  "message": "졸음 감지: PERCLOS 0.18, 눈 감김 지속 중. 즉시 휴식을 취하세요.",
-  "details": {
-    "ear": 0.21,
-    "mar": 0.45,
-    "perclos": 0.18,
-    "head_pose": "정면",
-    "objects_detected": [],
-    "face_detected": true
-  },
-  "elapsed_ms": 34.2
+  "alert_reason": "복합 위험 신호",
+  "llm_message": "위험 신호가 감지되었습니다! 잠시 휴식을 권장합니다.",
+  "inference_ms": 34.2
 }
 ```
 
