@@ -1,0 +1,117 @@
+{
+  "seed": 42,
+  "n_per_category": 100,
+  "n_total": 800,
+  "spec": [
+    {
+      "category": "normal",
+      "gt": 0,
+      "desc": "정상 주행 — 눈 뜸·정면·객체 없음"
+    },
+    {
+      "category": "brief_blink",
+      "gt": 0,
+      "desc": "순간 깜빡임 — EAR는 낮지만 PERCLOS 정상(졸음 아님)"
+    },
+    {
+      "category": "yawn",
+      "gt": 1,
+      "desc": "하품 — 초기 피로 신호"
+    },
+    {
+      "category": "drowsy",
+      "gt": 3,
+      "desc": "지속 졸음 — 눈 감김 지속·PERCLOS 높음"
+    },
+    {
+      "category": "distracted",
+      "gt": 2,
+      "desc": "주의산만 — 고개 이탈, 눈은 뜸(EAR 무력)"
+    },
+    {
+      "category": "phone",
+      "gt": 3,
+      "desc": "휴대폰 사용 — 눈 뜸·정면, 위험 객체(EAR 무력)"
+    },
+    {
+      "category": "phone_down",
+      "gt": 3,
+      "desc": "고개 숙여 폰 조작 — 객체+고개숙임"
+    },
+    {
+      "category": "drowsy_distr",
+      "gt": 3,
+      "desc": "졸음+주의산만 복합 이상"
+    }
+  ],
+  "results": {
+    "B1_EAR단일": {
+      "exact_acc": 0.375,
+      "missed_danger_rate": 0.6,
+      "silent_danger_rate": 0.6,
+      "false_alarm_rate": 0.5,
+      "us_per_decision": 0.31,
+      "per_category_acc": {
+        "normal": 1.0,
+        "brief_blink": 0.0,
+        "yawn": 0.0,
+        "drowsy": 1.0,
+        "distracted": 0.0,
+        "phone": 0.0,
+        "phone_down": 0.0,
+        "drowsy_distr": 1.0
+      }
+    },
+    "B2_EAR+PERCLOS": {
+      "exact_acc": 0.375,
+      "missed_danger_rate": 0.6,
+      "silent_danger_rate": 0.6,
+      "false_alarm_rate": 0.5,
+      "us_per_decision": 0.32,
+      "per_category_acc": {
+        "normal": 1.0,
+        "brief_blink": 0.0,
+        "yawn": 0.0,
+        "drowsy": 1.0,
+        "distracted": 0.0,
+        "phone": 0.0,
+        "phone_down": 0.0,
+        "drowsy_distr": 1.0
+      }
+    },
+    "Fusion_교체전": {
+      "exact_acc": 0.75,
+      "missed_danger_rate": 0.2,
+      "silent_danger_rate": 0.004,
+      "false_alarm_rate": 0.5,
+      "us_per_decision": 1.38,
+      "per_category_acc": {
+        "normal": 1.0,
+        "brief_blink": 0.0,
+        "yawn": 1.0,
+        "drowsy": 1.0,
+        "distracted": 0.0,
+        "phone": 1.0,
+        "phone_down": 1.0,
+        "drowsy_distr": 1.0
+      }
+    },
+    "Fusion_교체후": {
+      "exact_acc": 0.875,
+      "missed_danger_rate": 0.2,
+      "silent_danger_rate": 0.004,
+      "false_alarm_rate": 0.0,
+      "us_per_decision": 1.4,
+      "per_category_acc": {
+        "normal": 1.0,
+        "brief_blink": 1.0,
+        "yawn": 1.0,
+        "drowsy": 1.0,
+        "distracted": 0.0,
+        "phone": 1.0,
+        "phone_down": 1.0,
+        "drowsy_distr": 1.0
+      }
+    }
+  }
+}

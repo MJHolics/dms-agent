@@ -24,6 +24,7 @@ RIGHT_EYE  = [33, 160, 158, 133, 153, 144]
 MOUTH      = [61, 291, 13, 14, 17, 0, 402, 178]
 EAR_THRESH = 0.25
 MAR_THRESH = 0.60
+PERCLOS_THRESH = 0.15
 DANGEROUS  = {67: 'cell phone', 73: 'book'}
 
 # 프로젝트 루트 기준 모델 경로
@@ -199,7 +200,10 @@ def state_classifier_agent(state: DMSState) -> DMSState:
         return {**state, 'is_drowsy': False, 'is_yawning': False,
                 'is_distracted': False, 'has_danger_obj': False, 'risk_count': 1}
 
-    d = (state['ear'] or 1) < EAR_THRESH or (state['perclos'] or 0) > 0.15
+    # 졸음은 '지속'이다 — 순간 깜빡임(단발 EAR 하강)을 졸음으로 오판하면 오경보가 난다.
+    # tools/bench_fusion.py로 brief_blink 오경보 50%를 발견해, 순간 EAR 조건을 빼고
+    # PERCLOS(누적 눈감김 비율)만으로 졸음을 판정하도록 교체했다. README 정의와도 일치.
+    d = (state['perclos'] or 0) > PERCLOS_THRESH
     y = (state['mar'] or 0) > MAR_THRESH
     i = abs(state['yaw'] or 0) > 30 or (state['pitch'] or 0) > 20
     o = len(state['detected_objects']) > 0
@@ -215,7 +219,7 @@ def alert_manager_agent(state: DMSState) -> DMSState:
     obj  = state['detected_objects']
 
     if state['has_danger_obj']:   lv = 3; reason = f"위험 물체: {obj[0]['class']}"
-    elif perc > 0.15 or r >= 3:  lv = 3; reason = '심각한 졸음 운전'
+    elif perc > PERCLOS_THRESH or r >= 3:  lv = 3; reason = '심각한 졸음 운전'
     elif r == 2:                  lv = 2; reason = '복합 위험 신호'
     elif r == 1:                  lv = 1; reason = '주의 필요'
     else:                         lv = 0; reason = '정상'

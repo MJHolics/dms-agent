@@ -16,3 +16,4 @@ output/*.avi
 .vscode/
 CLAUDE.md
 anaconda_projects/
+models/*.task
