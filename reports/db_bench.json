@@ -1,0 +1,87 @@
+{
+  "postgres": "16.15",
+  "sessions": 36000,
+  "events": 1000000,
+  "runs": 7,
+  "table_size": "92 MB",
+  "index_size": {
+    "dms_events_ended_at_idx": "21 MB",
+    "dms_events_session_idx": "39 MB"
+  },
+  "before": {
+    "최근 경보 50건(dms_recent_events)": {
+      "median_ms": 111.217,
+      "min_ms": 99.257,
+      "max_ms": 119.874,
+      "scans": [
+        "Seq Scan",
+        "Seq Scan"
+      ]
+    },
+    "차량별 24시간 요약(dms_vehicle_summary)": {
+      "median_ms": 33.006,
+      "min_ms": 31.85,
+      "max_ms": 35.826,
+      "scans": [
+        "Seq Scan",
+        "Seq Scan"
+      ]
+    },
+    "7일 시간대별 건수(dms_hourly)": {
+      "median_ms": 51.486,
+      "min_ms": 49.823,
+      "max_ms": 54.431,
+      "scans": [
+        "Seq Scan"
+      ]
+    },
+    "한 세션의 최근 20건": {
+      "median_ms": 20.898,
+      "min_ms": 20.611,
+      "max_ms": 22.713,
+      "scans": [
+        "Index Scan(dms_sessions_pkey)",
+        "Seq Scan"
+      ]
+    }
+  },
+  "after": {
+    "최근 경보 50건(dms_recent_events)": {
+      "median_ms": 1.132,
+      "min_ms": 1.074,
+      "max_ms": 1.211,
+      "scans": [
+        "Index Scan(dms_events_ended_at_idx)",
+        "Index Scan(dms_sessions_pkey)"
+      ]
+    },
+    "차량별 24시간 요약(dms_vehicle_summary)": {
+      "median_ms": 19.948,
+      "min_ms": 19.49,
+      "max_ms": 21.323,
+      "scans": [
+        "Bitmap Heap Scan",
+        "Bitmap Index Scan(dms_events_ended_at_idx)",
+        "Seq Scan"
+      ]
+    },
+    "7일 시간대별 건수(dms_hourly)": {
+      "median_ms": 50.266,
+      "min_ms": 48.546,
+      "max_ms": 54.245,
+      "scans": [
+        "Bitmap Heap Scan",
+        "Bitmap Index Scan(dms_events_ended_at_idx)"
+      ]
+    },
+    "한 세션의 최근 20건": {
+      "median_ms": 0.179,
+      "min_ms": 0.169,
+      "max_ms": 0.242,
+      "scans": [
+        "Index Scan(dms_sessions_pkey)",
+        "Index Scan(dms_events_session_idx)"
+      ]
+    }
+  }
+}

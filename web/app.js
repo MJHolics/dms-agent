@@ -1,5 +1,6 @@
 import * as D from './decision.js';
 import { SCENARIO_SEC, eventAt, observe } from './scenario.js';
+import * as store from './store.js';
 
 const TASKS_VISION = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const MODEL_URLS = [
@@ -270,12 +271,30 @@ function drawCamera(lm, st) {
   ctx.restore();
 }
 
+// ── 경보 기록(카메라 모드에서만) ─────────────────────────────
+let session = null;
+let recorder = null;
+function showLog() {
+  if (!store.enabled) return;
+  $('log').hidden = false;
+  $('logText').textContent = session
+    ? `${session.vehicle} · 경보 ${session.saved}건 저장${session.failed ? ` · 실패 ${session.failed}건` : ''}`
+    : '카메라를 켜면 경보가 날 때마다 기록(시각·종류·수치)이 저장됩니다. 영상은 저장하지 않습니다.';
+}
+function record(now, st) {
+  if (!recorder) return;
+  const ev = recorder.update(now, st);
+  if (ev) session.log(ev).then(showLog);
+}
+showLog();
+
 function cameraFrame(now) {
   if (video.readyState < 2 || !video.videoWidth) return;
   if (view.width !== video.videoWidth) { view.width = video.videoWidth; view.height = video.videoHeight; }
   const result = landmarker.detectForVideo(video, performance.now());
   const { obs, lm } = toObservation(result, video.videoWidth, video.videoHeight);
   const st = monitor.update(now, obs);
+  record(now, st);
   drawCamera(lm, st);
   $('caption').textContent = st.calibrating
     ? '기준 자세를 재는 중입니다. 정면을 봐 주세요.'
@@ -317,6 +336,7 @@ async function startCamera() {
     $('btnDemo').hidden = false;
     $('btnRecal').hidden = false;
     keepAwake(true);
+    if (store.enabled) { session = new store.Session(); recorder = new store.EpisodeRecorder(); showLog(); }
   } catch (e) {
     stopCamera();
     const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
@@ -349,6 +369,7 @@ function startDemo() {
   $('btnDemo').hidden = true;
   $('btnRecal').hidden = true;
   keepAwake(false);
+  session = null; recorder = null; showLog();
 }
 
 $('btnCam').addEventListener('click', startCamera);

@@ -1,0 +1,30 @@
+# 경보 기록 저장소(로컬). Supabase와 같은 구성이다: PostgreSQL + PostgREST.
+#   docker compose -f docker-compose.db.yml up -d
+#   → REST http://127.0.0.1:3055  ·  psql 127.0.0.1:55432 (dms/dms)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dms
+      POSTGRES_PASSWORD: dms
+      POSTGRES_DB: dms
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dms -d dms"]
+      interval: 2s
+      retries: 30
+
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://dms:dms@db:5432/dms
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+    ports:
+      - "127.0.0.1:3055:3000"
