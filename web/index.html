@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>졸음 감지 — 운전석 카메라 한 대로</title>
+<meta name="description" content="눈을 2초 감으면 경보가 울립니다. 카메라만 있으면 브라우저에서 바로 해 볼 수 있습니다.">
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #131a22; --line: #243140; --text: #e8eef5; --dim: #8b9bb0;
+    --l0: #2fbf71; --l1: #f2c14e; --l2: #f08a3c; --l3: #ff3b4e; --accent: #5bc0ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif; }
+  body { padding: 16px 16px 40px; }
+  main { max-width: 980px; margin: 0 auto; }
+  header h1 { text-wrap: balance; font-size: clamp(22px, 4.6vw, 34px); margin: 4px 0 6px; letter-spacing: -0.02em; }
+  header p { margin: 0 0 14px; color: var(--dim); font-size: 15px; line-height: 1.55; }
+  header b { color: var(--text); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+  .stage { position: relative; background: #000; border-radius: 14px; overflow: hidden;
+    border: 3px solid var(--line); transition: border-color .15s; }
+  .stage canvas { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; background: #05080b; }
+  .stage[data-level="1"] { border-color: var(--l1); }
+  .stage[data-level="2"] { border-color: var(--l2); }
+  .stage[data-level="3"] { border-color: var(--l3); animation: flash .5s steps(2) infinite; }
+  @keyframes flash { 50% { box-shadow: 0 0 0 6px rgba(255, 59, 78, .55), inset 0 0 80px rgba(255, 59, 78, .45); } }
+  @media (prefers-reduced-motion: reduce) { .stage[data-level="3"] { animation: none; box-shadow: 0 0 0 6px rgba(255, 59, 78, .55); } }
+
+  .tag { position: absolute; top: 10px; left: 10px; background: rgba(11, 15, 20, .78); border: 1px solid var(--line);
+    padding: 4px 9px; border-radius: 999px; font-size: 12px; color: var(--dim); }
+  .banner { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px; display: flex; align-items: baseline; gap: 10px;
+    background: linear-gradient(transparent, rgba(5, 8, 11, .92) 45%); }
+  .banner .lv { font-weight: 800; font-size: clamp(20px, 4.4vw, 30px); color: var(--l0); white-space: nowrap; }
+  .banner .why { color: var(--text); font-size: 14px; }
+  .stage[data-level="1"] .lv { color: var(--l1); } .stage[data-level="2"] .lv { color: var(--l2); } .stage[data-level="3"] .lv { color: var(--l3); }
+
+  .caption { min-height: 22px; margin: 10px 2px 0; color: var(--accent); font-size: 14px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #04121c; border-color: var(--accent); font-weight: 700; }
+  button:disabled { opacity: .55; cursor: default; }
+  .note { color: var(--dim); font-size: 12.5px; margin: 8px 2px 0; line-height: 1.5; }
+  .error { color: var(--l2); }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .panel h2 { font-size: 13px; color: var(--dim); font-weight: 600; margin: 0 0 10px; letter-spacing: .02em; }
+  .chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+  .chip { text-align: center; padding: 9px 4px; border-radius: 10px; border: 1px solid var(--line); color: var(--dim); font-size: 14px; }
+  .chip.on { background: rgba(255, 59, 78, .16); border-color: var(--l3); color: #fff; font-weight: 700; }
+  .meter { margin: 0 0 11px; }
+  .meter .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .meter .row span:last-child { font-variant-numeric: tabular-nums; color: var(--dim); }
+  .bar { position: relative; height: 9px; background: #0b1016; border-radius: 5px; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--l0); border-radius: 5px; }
+  .bar i.hot { background: var(--l3); }
+  .bar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; opacity: .8; }
+  #timeline { display: block; width: 100%; height: 86px; margin-top: 4px; border-radius: 8px; background: #0b1016; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--dim); margin-top: 6px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  section.about { margin-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 760px) { section.about { grid-template-columns: 1fr; } }
+  .about h3 { margin: 0 0 6px; font-size: 15px; }
+  .about p { margin: 0; color: var(--dim); font-size: 13.5px; line-height: 1.6; }
+  .about strong { color: var(--text); }
+  footer { margin-top: 18px; color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+  footer a { color: var(--accent); }
+  #selftest { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>졸음 감지 — 운전석 카메라 한 대로</h1>
+    <p>화물차·지게차·크레인 운전자의 눈 감김과 한눈팔기를 잡습니다. <b>눈을 2초 감으면 경보가 울립니다.</b>
+       아래는 시연용 신호로 돌고 있고, 버튼을 누르면 내 얼굴로 바로 해 볼 수 있습니다.</p>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="stage" id="stage" data-level="0">
+        <canvas id="view" width="640" height="480"></canvas>
+        <div class="tag" id="tag">시연 재생 · 합성 신호</div>
+        <div class="banner"><span class="lv" id="lv">정상</span><span class="why" id="why"></span></div>
+      </div>
+      <p class="caption" id="caption"></p>
+      <div class="actions">
+        <button class="primary" id="btnCam">내 얼굴로 해 보기</button>
+        <button id="btnRecal" hidden>기준 다시 재기</button>
+        <button id="btnDemo" hidden>시연 다시 보기</button>
+        <button id="btnSound">경보음 켜기</button>
+      </div>
+      <p class="note" id="note">얼굴 영상은 이 브라우저 안에서만 처리하고 서버로 보내지 않습니다. 카메라를 켜면 2초 동안 정면을 봐 주세요.</p>
+    </div>
+
+    <div class="panel">
+      <h2>지금 보고 있는 신호</h2>
+      <div class="chips">
+        <div class="chip" id="cDrowsy">졸음</div>
+        <div class="chip" id="cYawn">하품</div>
+        <div class="chip" id="cDistract">한눈팔기</div>
+      </div>
+      <div class="meter"><div class="row"><span>연속 눈 감김</span><span id="vClosed">0.0초 / 2초</span></div><div class="bar"><i id="bClosed"></i></div></div>
+      <div class="meter"><div class="row"><span>최근 30초 중 감은 비율</span><span id="vPerclos">0% / 15%</span></div><div class="bar"><i id="bPerclos"></i><b style="left:37.5%"></b></div></div>
+      <div class="meter"><div class="row"><span>눈 뜬 정도</span><span id="vEar">-</span></div><div class="bar"><i id="bEar"></i><b id="mEar"></b></div></div>
+      <div class="meter"><div class="row"><span>입 벌림</span><span id="vMar">-</span></div><div class="bar"><i id="bMar"></i><b style="left:50%"></b></div></div>
+      <div class="meter"><div class="row"><span>고개 (좌우 / 숙임)</span><span id="vPose">-</span></div><div class="bar"><i id="bPose"></i><b style="left:60%"></b></div></div>
+      <h2 style="margin-top:14px">최근 30초</h2>
+      <canvas id="timeline" width="600" height="172"></canvas>
+      <div class="legend"><span><i style="background:var(--l0)"></i>정상</span><span><i style="background:var(--l1)"></i>주의</span><span><i style="background:var(--l2)"></i>위험</span><span><i style="background:var(--l3)"></i>경보</span><span>흰 선 = 눈 뜬 정도</span></div>
+    </div>
+  </div>
+
+  <section class="about">
+    <div class="panel"><h3>깜빡임과 졸음을 구분합니다</h3>
+      <p>눈이 감긴 순간이 아니라 <strong>이어서 감긴 시간</strong>과 <strong>30초 동안 감긴 비율</strong>로 판단합니다.
+      순간 값으로 판단하던 처음 규칙은 깜빡일 때마다 경보를 냈습니다. 바꾼 뒤 정상 상황의 오경보가 50%에서 0%가 됐습니다(합성 신호 800건).</p></div>
+    <div class="panel"><h3>눈만 보지 않습니다</h3>
+      <p>눈 감김 하나만 보는 방식은 위험 상황의 60%에서 아무 경보도 내지 않았습니다. 하품·고개 방향·휴대폰을 같이 보는 규칙은 0.4%입니다(합성 신호 800건).
+      신호 하나면 주의, 두 개가 겹치면 위험, 졸음이면 바로 경보입니다. 이 화면에는 휴대폰 검출이 빠져 있습니다.</p></div>
+    <div class="panel"><h3>카메라 위치를 가리지 않습니다</h3>
+      <p>처음 2초 동안 그 사람의 뜬 눈 크기와 그 카메라 위치에서의 정면 각도를 재서 기준으로 삼습니다.
+      판단 규칙은 파이썬 원본과 같은 입력 3,272프레임에 같은 답을 냅니다.</p></div>
+  </section>
+
+  <footer>
+    얼굴 랜드마크는 MediaPipe Face Landmarker(브라우저 WASM)로 구합니다. 시연 재생은 실제 사람 영상이 아니라 만든 신호입니다.<br>
+    코드 · 측정 기록: <a href="https://github.com/MJHolics/dms-agent" target="_blank" rel="noopener">github.com/MJHolics/dms-agent</a>
+    <div id="selftest"></div>
+  </footer>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
