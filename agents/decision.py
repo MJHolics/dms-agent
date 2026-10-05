@@ -20,7 +20,7 @@ PERCLOS_THRESH = 0.15
 YAW_THRESH     = 30.0     # 좌우, 절댓값(도)
 PITCH_THRESH   = 20.0     # 숙임이 양수(도)
 CLOSED_SEC_THRESH = 2.0   # 연속 눈 감김(초)
-PERCLOS_WINDOW_SEC = 30.0
+PERCLOS_WINDOW_SEC = 60.0   # 1분 창. 30초로 두면 2~3초 감김 한두 번에 15%를 넘어 경보가 30초 가까이 안 풀렸다(실기기 확인, 10-05)
 
 REASONS = {0: '정상', 1: '주의 필요', 2: '복합 위험 신호', 3: '심각한 졸음 운전'}
 
@@ -124,7 +124,7 @@ class DrowsinessTracker:
 # ── 기준 자세 보정 ──────────────────────────────────────────────
 CALIB_SEC = 2.0
 CALIB_MIN_SAMPLES = 10
-CALIB_EAR_RATIO = 0.75            # 뜬 눈 EAR의 이 비율 밑을 '감김'으로 본다
+CALIB_EAR_RATIO = 0.65            # 뜬 눈 EAR의 이 비율 밑을 감김으로 본다(0.75는 가늘게 뜬 눈까지 감김으로 셌다)
 CALIB_EAR_RANGE = (0.15, 0.30)
 
 

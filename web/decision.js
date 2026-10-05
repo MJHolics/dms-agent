@@ -11,7 +11,7 @@ export const PERCLOS_THRESH = 0.15;
 export const YAW_THRESH = 30.0;
 export const PITCH_THRESH = 20.0;
 export const CLOSED_SEC_THRESH = 2.0;
-export const PERCLOS_WINDOW_SEC = 30.0;
+export const PERCLOS_WINDOW_SEC = 60.0;
 
 export const REASONS = { 0: '정상', 1: '주의 필요', 2: '복합 위험 신호', 3: '심각한 졸음 운전' };
 
@@ -90,7 +90,7 @@ export class DrowsinessTracker {
 
 export const CALIB_SEC = 2.0;
 export const CALIB_MIN_SAMPLES = 10;
-export const CALIB_EAR_RATIO = 0.75;
+export const CALIB_EAR_RATIO = 0.65;
 export const CALIB_EAR_RANGE = [0.15, 0.30];
 
 function median(v) {

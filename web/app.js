@@ -68,7 +68,7 @@ function explain(st) {
   if (st.is_drowsy) {
     return st.closed_sec >= D.CLOSED_SEC_THRESH
       ? `눈을 ${st.closed_sec.toFixed(1)}초째 감고 있습니다`
-      : `최근 30초의 ${(st.perclos * 100).toFixed(0)}%를 눈 감고 있었습니다`;
+      : `최근 1분의 ${(st.perclos * 100).toFixed(0)}%를 눈 감고 있었습니다`;
   }
   const why = [];
   if (st.is_yawning) why.push('하품');
