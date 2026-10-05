@@ -16,11 +16,13 @@ MOUTH     = [78, 81, 13, 311, 308, 402, 14, 178]
 # ── 임계 ────────────────────────────────────────────────────────
 EAR_THRESH     = 0.25
 MAR_THRESH     = 0.60
-PERCLOS_THRESH = 0.15
+PERCLOS_THRESH = 0.60     # 최근 5초 중 3초 이상
 YAW_THRESH     = 30.0     # 좌우, 절댓값(도)
 PITCH_THRESH   = 20.0     # 숙임이 양수(도)
 CLOSED_SEC_THRESH = 2.0   # 연속 눈 감김(초)
-PERCLOS_WINDOW_SEC = 60.0   # 1분 창. 30초로 두면 2~3초 감김 한두 번에 15%를 넘어 경보가 30초 가까이 안 풀렸다(실기기 확인, 10-05)
+PERCLOS_WINDOW_SEC = 5.0
+# 창과 임계의 이력: 프레임 900개·15% → 30초·15% → 1분·15% → 5초·60%.
+# 긴 창은 눈을 뜬 뒤에도 창이 지나갈 때까지 경보가 남았다(실기기 확인, 10-05). 짧은 창은 눈을 뜨면 3초 안에 풀린다.
 
 REASONS = {0: '정상', 1: '주의 필요', 2: '복합 위험 신호', 3: '심각한 졸음 운전'}
 
@@ -127,6 +129,29 @@ CALIB_MIN_SAMPLES = 10
 CALIB_EAR_RATIO = 0.65            # 뜬 눈 EAR의 이 비율 밑을 감김으로 본다(0.75는 가늘게 뜬 눈까지 감김으로 셌다)
 CALIB_EAR_RANGE = (0.15, 0.30)
 
+# 눈 감김 신호를 EAR 대신 학습된 눈 감김 점수(MediaPipe blendshape eyeBlink)로 줄 때의 값.
+# EAR은 눈꺼풀 사이 거리라서 눈이 작은 사람이 웃거나 가늘게 뜨면 감은 것과 구분되지 않았다(실기기 확인, 10-05).
+BLINK_OPEN_THRESH = 0.40
+BLINK_OPEN_RATIO = 0.45
+BLINK_OPEN_RANGE = (0.30, 0.50)
+
+
+SQUINT_RELIEF = 0.40      # 웃음·찡그림 점수 1.0일 때 뜬 정도에 더해 주는 양
+
+
+def squint_score(eye_squint, cheek_squint, mouth_smile):
+    """눈 주변 근육 신호(각각 좌우 평균, 0~1) 중 가장 큰 값. 웃거나 찡그리면 올라간다."""
+    return max(eye_squint, cheek_squint, mouth_smile)
+
+
+def eye_openness(blink_left, blink_right, squint=0.0):
+    """두 눈의 감김 점수(0~1) → 뜬 정도(0~1). 한쪽만 감은 윙크는 뜬 것으로 본다.
+
+    웃거나 찡그리면 눈이 가늘어져 감김 점수도 같이 오른다. 그때는 눈 주변 근육 점수만큼 덜 감은 것으로 본다.
+    졸아서 감긴 눈은 얼굴 근육이 풀려 있어 이 보정을 받지 않는다(웃으면서 감은 눈은 놓칠 수 있다).
+    """
+    return min(1.0, 1.0 - min(blink_left, blink_right) + SQUINT_RELIEF * squint)
+
 
 def _median(v):
     s = sorted(v)
@@ -141,13 +166,16 @@ class Calibrator:
     뜬 눈의 EAR도 사람마다 다르다. 고정 임계만 쓰면 가만히 있어도 경보가 난다.
     """
 
-    def __init__(self, duration_sec=CALIB_SEC, min_samples=CALIB_MIN_SAMPLES):
+    def __init__(self, duration_sec=CALIB_SEC, min_samples=CALIB_MIN_SAMPLES,
+                 ear_ratio=CALIB_EAR_RATIO, ear_range=CALIB_EAR_RANGE, ear_thresh=EAR_THRESH):
         self.duration_sec = duration_sec
         self.min_samples = min_samples
+        self.ear_ratio = ear_ratio
+        self.ear_range = ear_range
         self.t0 = None
         self.ears, self.pitches, self.yaws = [], [], []
         self.done = False
-        self.ear_thresh = EAR_THRESH
+        self.ear_thresh = ear_thresh
         self.pitch0 = 0.0
         self.yaw0 = 0.0
 
@@ -161,8 +189,8 @@ class Calibrator:
         self.pitches.append(pitch)
         self.yaws.append(yaw)
         if t - self.t0 >= self.duration_sec and len(self.ears) >= self.min_samples:
-            lo, hi = CALIB_EAR_RANGE
-            self.ear_thresh = min(hi, max(lo, _median(self.ears) * CALIB_EAR_RATIO))
+            lo, hi = self.ear_range
+            self.ear_thresh = min(hi, max(lo, _median(self.ears) * self.ear_ratio))
             self.pitch0 = _median(self.pitches)
             self.yaw0 = _median(self.yaws)
             self.done = True
@@ -172,9 +200,11 @@ class Calibrator:
 class Monitor:
     """관측 한 건(시각 + 신호) → 판단 한 건. 보정 → 시간 누적 → 분류 → 경보."""
 
-    def __init__(self, calibrate=True):
-        self.calibrator = Calibrator() if calibrate else None
-        self.tracker = DrowsinessTracker()
+    def __init__(self, calibrate=True, ear_ratio=CALIB_EAR_RATIO, ear_range=CALIB_EAR_RANGE, ear_thresh=EAR_THRESH):
+        """눈 신호가 EAR이면 기본값, 눈 감김 점수면 BLINK_OPEN_* 값을 넘긴다."""
+        self.calibrator = (Calibrator(ear_ratio=ear_ratio, ear_range=ear_range, ear_thresh=ear_thresh)
+                           if calibrate else None)
+        self.tracker = DrowsinessTracker(ear_thresh=ear_thresh)
 
     def update(self, t, obs):
         """obs: face_detected, ear, mar, pitch, yaw, detected_objects. t는 초."""

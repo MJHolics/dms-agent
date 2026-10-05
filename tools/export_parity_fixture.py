@@ -69,9 +69,13 @@ def _sequence(rng, fps, seconds, events):
 SEQUENCES = [
     ('30fps 깜빡임·2초 감김', 30, 40, [(5, 5.15, 'closed'), (9, 9.2, 'closed'), (14, 16.6, 'closed'), (30, 30.2, 'closed')]),
     ('15fps 하품·고개 돌림·숙임', 15, 40, [(6, 9, 'yawn'), (14, 18, 'turn'), (24, 28, 'nod'), (33, 36, 'yawn'), (34, 36, 'turn')]),
-    ('8fps 누적 졸음(짧게 여러 번)', 8, 60, [(s, s + 1.2, 'closed') for s in range(6, 50, 5)]),
+    ('8fps 누적 졸음(짧게 여러 번)', 8, 60, [(s, s + 1.7, 'closed') for s in range(6, 50, 2)]),
     ('24fps 얼굴 사라짐·휴대폰', 24, 40, [(1.0, 1.6, 'noface'), (10, 13, 'noface'), (20, 23, 'phone'), (30, 33.5, 'closed'), (31, 33, 'turn')]),
     ('60fps 보정 중 깜빡임', 60, 20, [(0.5, 0.7, 'closed'), (8, 10.5, 'closed'), (9, 10, 'yawn'), (9.5, 10.5, 'nod')]),
+]
+
+BLINK_SEQUENCES = [
+    ('눈 감김 점수 30fps 웃음·2초 감김', 30, 40, [(5, 12, 'smile'), (8, 8.2, 'closed'), (20, 23, 'closed'), (30, 33, 'smile')]),
 ]
 
 
@@ -95,7 +99,7 @@ def main():
     for _ in range(200):
         rows.append({'face_detected': rng.random() > 0.1, 'closed_sec': rng.choice([0.0, 0.5, 1.99, 2.0, 2.01, 5.0]),
                      'mar': rng.uniform(0, 1.2), 'pitch': rng.uniform(-40, 40), 'yaw': rng.uniform(-60, 60),
-                     'perclos': rng.choice([0.0, 0.1, 0.15, 0.1500001, 0.3]),
+                     'perclos': rng.choice([0.0, 0.3, 0.6, 0.6000001, 0.9]),
                      'detected_objects': [{'class': 'book'}] if rng.random() < 0.15 else []})
     decisions = []
     for s in rows:
@@ -107,12 +111,35 @@ def main():
     for name, fps, seconds, events in SEQUENCES:
         frames = _sequence(rng, fps, seconds, events)
         mon = D.Monitor()
-        sequences.append({'name': name, 'frames': frames,
+        sequences.append({'name': name, 'mode': 'ear', 'frames': frames,
                           'expected': [mon.update(f['t'], f['obs']) for f in frames]})
+
+    # 눈 감김 점수 모드: 뜬 눈 0.9 안팎, 웃을 때 0.55(감김 아님), 감으면 0.1
+    for name, fps, seconds, events in BLINK_SEQUENCES:
+        frames = _sequence(rng, fps, seconds, [e for e in events if e[2] != 'smile'])
+        for f in frames:
+            o = f['obs']
+            if not o['face_detected']:
+                continue
+            closed = o['ear'] < 0.15
+            smiling = any(a <= f['t'] < b for a, b, k in events if k == 'smile')
+            # 웃을 때 감김 점수가 0.7까지 올라도(작은 눈) 근육 점수 0.8이 같이 뜨면 감김으로 세지 않아야 한다.
+            l = (0.9 if closed else 0.70 if smiling else 0.08) + rng.gauss(0, 0.02)
+            sq = D.squint_score(0.5 if smiling else 0.05, 0.8 if smiling else 0.02, 0.7 if smiling else 0.03)
+            o['ear'] = D.eye_openness(l, l + rng.gauss(0, 0.03), 0.0 if closed else sq)
+        mon = D.Monitor(ear_ratio=D.BLINK_OPEN_RATIO, ear_range=D.BLINK_OPEN_RANGE, ear_thresh=D.BLINK_OPEN_THRESH)
+        sequences.append({'name': name, 'mode': 'blink', 'frames': frames,
+                          'expected': [mon.update(f['t'], f['obs']) for f in frames]})
+
+    openness = []
+    for _ in range(200):
+        a = [rng.random() for _ in range(5)]
+        sq = D.squint_score(a[2], a[3], a[4])
+        openness.append({'args': a, 'squint': sq, 'open': D.eye_openness(a[0], a[1], sq)})
 
     out = os.path.join(ROOT, 'web', 'tests', 'fixture.json')
     with open(out, 'w', encoding='utf-8') as f:
-        json.dump({'seed': SEED, 'geometry': geometry, 'angles': angles,
+        json.dump({'seed': SEED, 'geometry': geometry, 'angles': angles, 'openness': openness,
                    'decisions': decisions, 'sequences': sequences}, f, ensure_ascii=False)
 
     n_frames = sum(len(s['frames']) for s in sequences)

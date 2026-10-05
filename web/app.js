@@ -19,6 +19,11 @@ const tl = $('timeline');
 const tctx = tl.getContext('2d');
 
 let mode = 'demo';            // 'demo' | 'camera'
+// 카메라 모드는 눈 감김 점수(blendshape), 시연 재생은 EAR 신호를 쓴다.
+const newMonitor = () => (mode === 'camera'
+  ? new D.Monitor(true, D.BLINK_OPEN_RATIO, D.BLINK_OPEN_RANGE, D.BLINK_OPEN_THRESH)
+  : new D.Monitor());
+const eyeScale = () => (mode === 'camera' ? 1.0 : 0.45);
 let monitor = new D.Monitor();
 let history = [];             // {t, ear, level}
 let lastL3 = -Infinity;
@@ -68,7 +73,7 @@ function explain(st) {
   if (st.is_drowsy) {
     return st.closed_sec >= D.CLOSED_SEC_THRESH
       ? `눈을 ${st.closed_sec.toFixed(1)}초째 감고 있습니다`
-      : `최근 1분의 ${(st.perclos * 100).toFixed(0)}%를 눈 감고 있었습니다`;
+      : `최근 ${D.PERCLOS_WINDOW_SEC}초 중 ${(st.perclos * D.PERCLOS_WINDOW_SEC).toFixed(1)}초를 눈 감고 있었습니다`;
   }
   const why = [];
   if (st.is_yawning) why.push('하품');
@@ -96,13 +101,16 @@ function render(now, obs, st) {
 
   $('vClosed').textContent = `${st.closed_sec.toFixed(1)}초 / ${D.CLOSED_SEC_THRESH}초`;
   setBar('bClosed', st.closed_sec / D.CLOSED_SEC_THRESH, st.closed_sec >= D.CLOSED_SEC_THRESH);
-  $('vPerclos').textContent = `${(st.perclos * 100).toFixed(0)}% / ${D.PERCLOS_THRESH * 100}%`;
-  setBar('bPerclos', st.perclos / 0.4, st.perclos > D.PERCLOS_THRESH);
+  $('vPerclos').textContent = `${(st.perclos * D.PERCLOS_WINDOW_SEC).toFixed(1)}초 / ${(D.PERCLOS_THRESH * D.PERCLOS_WINDOW_SEC).toFixed(0)}초`;
+  setBar('bPerclos', st.perclos, st.perclos > D.PERCLOS_THRESH);
 
   const face = obs.face_detected;
   $('vEar').textContent = face ? `${obs.ear.toFixed(2)} (기준 ${st.ear_thresh.toFixed(2)})` : '얼굴 없음';
-  setBar('bEar', face ? obs.ear / 0.45 : 0, face && obs.ear < st.ear_thresh);
-  $('mEar').style.left = `${(st.ear_thresh / 0.45) * 100}%`;
+  const sq = face && obs.squint !== undefined ? obs.squint : null;
+  $('mSquint').hidden = sq === null;
+  if (sq !== null) { $('vSquint').textContent = sq.toFixed(2); setBar('bSquint', sq, false); }
+  setBar('bEar', face ? obs.ear / eyeScale() : 0, face && obs.ear < st.ear_thresh);
+  $('mEar').style.left = `${(st.ear_thresh / eyeScale()) * 100}%`;
   $('vMar').textContent = face ? obs.mar.toFixed(2) : '-';
   setBar('bMar', face ? obs.mar / 1.2 : 0, st.is_yawning);
   if (st.yaw === null || st.yaw === undefined) {
@@ -123,7 +131,7 @@ function drawTimeline(now, earThresh) {
   const w = tl.width, h = tl.height;
   tctx.clearRect(0, 0, w, h);
   const x = (t) => w - ((now - t) / HISTORY_SEC) * w;
-  const y = (e) => h - 8 - (Math.min(e, 0.45) / 0.45) * (h - 16);
+  const y = (e) => h - 8 - (Math.min(e, eyeScale()) / eyeScale()) * (h - 16);
   for (let i = 0; i < history.length; i++) {
     const a = history[i];
     const end = i + 1 < history.length ? history[i + 1].t : now;
@@ -202,7 +210,7 @@ function demoFrame(now) {
   let t = now - demoStart;
   if (t >= SCENARIO_SEC) {         // 한 바퀴 돌면 처음부터
     demoStart = now; t = 0;
-    monitor = new D.Monitor(); history = []; lastL3 = -Infinity;
+    monitor = newMonitor(); history = []; lastL3 = -Infinity;
   }
   const obs = observe(t);
   const st = monitor.update(now, obs);
@@ -222,7 +230,7 @@ async function loadLandmarker() {
       try {
         landmarker = await FaceLandmarker.createFromOptions(fileset, {
           baseOptions: { modelAssetPath: url, delegate },
-          runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: true,
+          runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: true, outputFaceBlendshapes: true,
         });
         return landmarker;
       } catch (e) { lastErr = e; }
@@ -236,7 +244,14 @@ export function toObservation(result, w, h) {
   const lm = result.faceLandmarks && result.faceLandmarks[0];
   if (!lm) return { obs: { face_detected: false, ear: null, mar: null, pitch: null, yaw: null, detected_objects: [] }, lm: null };
   const pts = (idx) => idx.map((i) => [lm[i].x * w, lm[i].y * h]);
-  const earV = (D.ear(pts(D.LEFT_EYE)) + D.ear(pts(D.RIGHT_EYE))) / 2;
+  const earGeom = (D.ear(pts(D.LEFT_EYE)) + D.ear(pts(D.RIGHT_EYE))) / 2;
+  // 눈 신호는 학습된 눈 감김 점수에서 얻는다. EAR은 눈이 작거나 웃을 때 감김과 구분되지 않았다.
+  const cats = result.faceBlendshapes && result.faceBlendshapes[0] ? result.faceBlendshapes[0].categories : [];
+  const score = (name) => { const c = cats.find((k) => k.categoryName === name); return c ? c.score : 0; };
+  const pair = (name) => (score(`${name}Left`) + score(`${name}Right`)) / 2;
+  // 눈꼬리·광대·입꼬리: 웃거나 찡그려서 가늘어진 눈을 감은 눈과 가른다.
+  const squint = D.squintScore(pair('eyeSquint'), pair('cheekSquint'), pair('mouthSmile'));
+  const earV = D.eyeOpenness(score('eyeBlinkLeft'), score('eyeBlinkRight'), squint);
   const marV = D.mar(pts(D.MOUTH));
   let pitch = 0, yaw = 0;
   const mat = result.facialTransformationMatrixes && result.facialTransformationMatrixes[0];
@@ -247,7 +262,7 @@ export function toObservation(result, w, h) {
     const m = [0, 1, 2, 3].map((r) => [0, 1, 2, 3].map((c) => (colMajor ? d[c * 4 + r] : d[r * 4 + c])));
     [pitch, yaw] = D.headAngles(m);
   }
-  return { obs: { face_detected: true, ear: earV, mar: marV, pitch, yaw, detected_objects: [] }, lm };
+  return { obs: { face_detected: true, ear: earV, mar: marV, pitch, yaw, detected_objects: [], squint }, lm, earGeom };
 }
 
 function drawCamera(lm, st) {
@@ -264,7 +279,8 @@ function drawCamera(lm, st) {
       idx.forEach((i, k) => (k ? ctx.lineTo(lm[i].x * w, lm[i].y * h) : ctx.moveTo(lm[i].x * w, lm[i].y * h)));
       ctx.closePath(); ctx.stroke();
     };
-    const eyeColor = st.is_drowsy ? LEVEL_COLOR[3] : (st.closed_sec > 0 ? LEVEL_COLOR[1] : LEVEL_COLOR[0]);
+    // 윤곽 색은 지금 눈 상태만 따른다. 누적 비율로 난 경보는 배너와 막대가 보여 준다.
+    const eyeColor = st.closed_sec >= D.CLOSED_SEC_THRESH ? LEVEL_COLOR[3] : (st.closed_sec > 0 ? LEVEL_COLOR[1] : LEVEL_COLOR[0]);
     poly(D.LEFT_EYE, eyeColor); poly(D.RIGHT_EYE, eyeColor);
     poly(D.MOUTH, st.is_yawning ? LEVEL_COLOR[1] : LEVEL_COLOR[0]);
   }
@@ -313,7 +329,7 @@ async function keepAwake(on) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && mode === 'camera') keepAwake(true); });
 
 function resetState() {
-  monitor = new D.Monitor(); history = []; lastL3 = -Infinity;
+  monitor = newMonitor(); history = []; lastL3 = -Infinity;
 }
 
 async function startCamera() {
@@ -329,8 +345,8 @@ async function startCamera() {
     await video.play();
     btn.textContent = '모델 불러오는 중…';
     await loadLandmarker();
-    resetState();
     mode = 'camera';
+    resetState();
     $('tag').textContent = '내 카메라 · 이 기기 안에서 처리';
     btn.hidden = true;
     $('btnDemo').hidden = false;
@@ -397,7 +413,8 @@ if (new URLSearchParams(location.search).has('selftest')) {
       const img = await createImageBitmap(await (await fetch('./tests/face.png')).blob());
       const lmk = await loadLandmarker();
       await lmk.setOptions({ runningMode: 'IMAGE' });
-      const { obs } = toObservation(lmk.detect(img), img.width, img.height);
+      const { obs, earGeom } = toObservation(lmk.detect(img), img.width, img.height);
+      obs.eye_open = obs.ear; obs.ear = earGeom;
       await lmk.setOptions({ runningMode: 'VIDEO' });
       const py = { ear: 0.3124, mar: 0.2213, pitch: 14.92, yaw: -0.29 };
       const rows = Object.keys(py).map((k) => `${k}: 브라우저 ${obs[k].toFixed(4)} · 파이썬 ${py[k]} · 차이 ${(obs[k] - py[k]).toFixed(4)}`);

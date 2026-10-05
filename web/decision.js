@@ -7,11 +7,11 @@ export const MOUTH = [78, 81, 13, 311, 308, 402, 14, 178];
 
 export const EAR_THRESH = 0.25;
 export const MAR_THRESH = 0.60;
-export const PERCLOS_THRESH = 0.15;
+export const PERCLOS_THRESH = 0.60;
 export const YAW_THRESH = 30.0;
 export const PITCH_THRESH = 20.0;
 export const CLOSED_SEC_THRESH = 2.0;
-export const PERCLOS_WINDOW_SEC = 60.0;
+export const PERCLOS_WINDOW_SEC = 5.0;
 
 export const REASONS = { 0: '정상', 1: '주의 필요', 2: '복합 위험 신호', 3: '심각한 졸음 운전' };
 
@@ -93,6 +93,20 @@ export const CALIB_MIN_SAMPLES = 10;
 export const CALIB_EAR_RATIO = 0.65;
 export const CALIB_EAR_RANGE = [0.15, 0.30];
 
+export const BLINK_OPEN_THRESH = 0.40;
+export const BLINK_OPEN_RATIO = 0.45;
+export const BLINK_OPEN_RANGE = [0.30, 0.50];
+
+export const SQUINT_RELIEF = 0.40;
+
+export function squintScore(eyeSquint, cheekSquint, mouthSmile) {
+  return Math.max(eyeSquint, cheekSquint, mouthSmile);
+}
+
+export function eyeOpenness(blinkLeft, blinkRight, squint = 0.0) {
+  return Math.min(1.0, 1.0 - Math.min(blinkLeft, blinkRight) + SQUINT_RELIEF * squint);
+}
+
 function median(v) {
   const s = [...v].sort((a, b) => a - b);
   const n = s.length;
@@ -100,15 +114,18 @@ function median(v) {
 }
 
 export class Calibrator {
-  constructor(durationSec = CALIB_SEC, minSamples = CALIB_MIN_SAMPLES) {
+  constructor(durationSec = CALIB_SEC, minSamples = CALIB_MIN_SAMPLES,
+    earRatio = CALIB_EAR_RATIO, earRange = CALIB_EAR_RANGE, earThresh = EAR_THRESH) {
     this.durationSec = durationSec;
     this.minSamples = minSamples;
+    this.earRatio = earRatio;
+    this.earRange = earRange;
     this.t0 = null;
     this.ears = [];
     this.pitches = [];
     this.yaws = [];
     this.done = false;
-    this.earThresh = EAR_THRESH;
+    this.earThresh = earThresh;
     this.pitch0 = 0.0;
     this.yaw0 = 0.0;
   }
@@ -120,8 +137,8 @@ export class Calibrator {
     this.pitches.push(pitch);
     this.yaws.push(yaw);
     if (t - this.t0 >= this.durationSec && this.ears.length >= this.minSamples) {
-      const [lo, hi] = CALIB_EAR_RANGE;
-      this.earThresh = Math.min(hi, Math.max(lo, median(this.ears) * CALIB_EAR_RATIO));
+      const [lo, hi] = this.earRange;
+      this.earThresh = Math.min(hi, Math.max(lo, median(this.ears) * this.earRatio));
       this.pitch0 = median(this.pitches);
       this.yaw0 = median(this.yaws);
       this.done = true;
@@ -138,9 +155,9 @@ export class Calibrator {
 }
 
 export class Monitor {
-  constructor(calibrate = true) {
-    this.calibrator = calibrate ? new Calibrator() : null;
-    this.tracker = new DrowsinessTracker();
+  constructor(calibrate = true, earRatio = CALIB_EAR_RATIO, earRange = CALIB_EAR_RANGE, earThresh = EAR_THRESH) {
+    this.calibrator = calibrate ? new Calibrator(CALIB_SEC, CALIB_MIN_SAMPLES, earRatio, earRange, earThresh) : null;
+    this.tracker = new DrowsinessTracker(PERCLOS_WINDOW_SEC, earThresh);
   }
 
   // obs: face_detected, ear, mar, pitch, yaw, detected_objects. t는 초.

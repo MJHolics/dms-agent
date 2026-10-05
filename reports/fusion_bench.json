@@ -50,7 +50,7 @@
       "missed_danger_rate": 0.6,
       "silent_danger_rate": 0.6,
       "false_alarm_rate": 0.5,
-      "us_per_decision": 0.31,
+      "us_per_decision": 0.35,
       "per_category_acc": {
         "normal": 1.0,
         "brief_blink": 0.0,
@@ -67,7 +67,7 @@
       "missed_danger_rate": 0.6,
       "silent_danger_rate": 0.6,
       "false_alarm_rate": 0.5,
-      "us_per_decision": 0.32,
+      "us_per_decision": 0.52,
       "per_category_acc": {
         "normal": 1.0,
         "brief_blink": 0.0,
@@ -84,7 +84,7 @@
       "missed_danger_rate": 0.2,
       "silent_danger_rate": 0.004,
       "false_alarm_rate": 0.5,
-      "us_per_decision": 1.38,
+      "us_per_decision": 1.48,
       "per_category_acc": {
         "normal": 1.0,
         "brief_blink": 0.0,
@@ -101,7 +101,7 @@
       "missed_danger_rate": 0.2,
       "silent_danger_rate": 0.004,
       "false_alarm_rate": 0.0,
-      "us_per_decision": 1.4,
+      "us_per_decision": 1.63,
       "per_category_acc": {
         "normal": 1.0,
         "brief_blink": 1.0,

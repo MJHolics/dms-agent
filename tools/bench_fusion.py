@@ -31,11 +31,12 @@ import random
 # 결정 계층은 모델을 호출하지 않으므로 무거운 모델 로드 없이 실제 코드를 그대로 쓴다.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.pipeline import state_classifier_agent, alert_manager_agent  # noqa: E402
+from agents import decision  # noqa: E402
 
 SEED = 42
 N_PER_CATEGORY = 100          # 카테고리당 표본 수
 EAR_THRESH = 0.25             # pipeline.py와 동일
-PERCLOS_THRESH = 0.15
+PERCLOS_THRESH = decision.PERCLOS_THRESH   # 최근 5초 중 감은 비율의 임계
 
 # ── 안전 스펙(독립 정의) ──────────────────────────────────────────────
 # 각 상황이 어떤 신호 분포를 갖고, 안전상 어떤 경보 레벨이 "옳은지"를 정의한다.
@@ -67,7 +68,7 @@ SPEC = [
      '순간 깜빡임 — EAR는 낮지만 PERCLOS 정상(졸음 아님)'),
     ('yawn',         1, dict(ear=0.30, mar=0.72, pitch=3,  yaw=4,  perclos=0.04, phone=False),
      '하품 — 초기 피로 신호'),
-    ('drowsy',       3, dict(ear=0.18, mar=0.40, pitch=6,  yaw=4,  perclos=0.28, phone=False),
+    ('drowsy',       3, dict(ear=0.18, mar=0.40, pitch=6,  yaw=4,  perclos=0.80, phone=False),
      '지속 졸음 — 눈 감김 지속·PERCLOS 높음'),
     ('distracted',   2, dict(ear=0.31, mar=0.36, pitch=6,  yaw=42, perclos=0.03, phone=False),
      '주의산만 — 고개 이탈, 눈은 뜸(EAR 무력)'),
@@ -75,7 +76,7 @@ SPEC = [
      '휴대폰 사용 — 눈 뜸·정면, 위험 객체(EAR 무력)'),
     ('phone_down',   3, dict(ear=0.29, mar=0.37, pitch=26, yaw=8,  perclos=0.03, phone=True),
      '고개 숙여 폰 조작 — 객체+고개숙임'),
-    ('drowsy_distr', 3, dict(ear=0.17, mar=0.42, pitch=7,  yaw=40, perclos=0.30, phone=False),
+    ('drowsy_distr', 3, dict(ear=0.17, mar=0.42, pitch=7,  yaw=40, perclos=0.85, phone=False),
      '졸음+주의산만 복합 이상'),
 ]
 

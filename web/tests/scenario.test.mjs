@@ -22,6 +22,6 @@ for (const fps of [60, 30, 15, 8]) {
     assert.equal(maxLevel(rows, 18.6, 22.9), 0, '감은 지 2초 전에는 경보가 없어야 한다');
     const first = rows.find((r) => r.alert_level === 3);
     assert.ok(first && first.t >= 23.0 && first.t <= 23.0 + 0.1 + 2 / fps, `경보 시각 ${first && first.t}`);
-    assert.equal(maxLevel(rows, 25.3, 30), 0, '눈을 뜨면 풀린다');
+    assert.equal(maxLevel(rows, 24.1, 30), 0, '눈을 뜨면 풀린다');
   });
 }

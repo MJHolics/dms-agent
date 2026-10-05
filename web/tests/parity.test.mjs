@@ -24,6 +24,15 @@ test('변환 행렬 → 고개 각도', () => {
   }
 });
 
+test('눈 감김 점수 + 눈 주변 근육 → 뜬 정도', () => {
+  for (const [i, o] of fx.openness.entries()) {
+    const [bl, br, es, cs, ms] = o.args;
+    const sq = D.squintScore(es, cs, ms);
+    close(sq, o.squint, `squint #${i}`);
+    close(D.eyeOpenness(bl, br, sq), o.open, `open #${i}`);
+  }
+});
+
 test('신호 → 위험 플래그 → 경보 레벨', () => {
   for (const [i, d] of fx.decisions.entries()) {
     const flags = D.classify(d.input);
@@ -36,7 +45,9 @@ test('신호 → 위험 플래그 → 경보 레벨', () => {
 
 for (const seq of fx.sequences) {
   test(`시퀀스 전체 — ${seq.name}`, () => {
-    const mon = new D.Monitor();
+    const mon = seq.mode === 'blink'
+      ? new D.Monitor(true, D.BLINK_OPEN_RATIO, D.BLINK_OPEN_RANGE, D.BLINK_OPEN_THRESH)
+      : new D.Monitor();
     for (const [i, f] of seq.frames.entries()) {
       const got = mon.update(f.t, f.obs);
       const want = seq.expected[i];

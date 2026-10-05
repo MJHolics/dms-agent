@@ -20,8 +20,8 @@ test('시연 재생 → 이벤트 4건', () => {
   assert.deepEqual(events.map((e) => [e.level, e.cause]),
     [[1, 'yawn'], [1, 'distracted'], [2, 'compound'], [3, 'eyes_closed']]);
   const last = events[3];
-  assert.ok(last.closed_sec > 3.5 && last.closed_sec < 4.2, `closed_sec ${last.closed_sec}`);
-  assert.ok(last.duration_ms > 1500 && last.duration_ms < 2300, `duration ${last.duration_ms}`);
+  assert.ok(last.closed_sec > 2.4 && last.closed_sec < 3.0, `closed_sec ${last.closed_sec}`);
+  assert.ok(last.duration_ms > 400 && last.duration_ms < 1100, `duration ${last.duration_ms}`);
 });
 
 test('0.4초보다 짧은 신호는 기록하지 않는다', () => {
