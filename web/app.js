@@ -393,12 +393,11 @@ if (new URLSearchParams(location.search).has('selftest')) {
   (async () => {
     const out = $('selftest');
     try {
-      const img = new Image();
-      img.src = './tests/face.png';
-      await img.decode();
+      // 가려진 탭에서는 Image.decode()가 끝나지 않아 비트맵으로 읽는다.
+      const img = await createImageBitmap(await (await fetch('./tests/face.png')).blob());
       const lmk = await loadLandmarker();
       await lmk.setOptions({ runningMode: 'IMAGE' });
-      const { obs } = toObservation(lmk.detect(img), img.naturalWidth, img.naturalHeight);
+      const { obs } = toObservation(lmk.detect(img), img.width, img.height);
       await lmk.setOptions({ runningMode: 'VIDEO' });
       const py = { ear: 0.3124, mar: 0.2213, pitch: 14.92, yaw: -0.29 };
       const rows = Object.keys(py).map((k) => `${k}: 브라우저 ${obs[k].toFixed(4)} · 파이썬 ${py[k]} · 차이 ${(obs[k] - py[k]).toFixed(4)}`);
